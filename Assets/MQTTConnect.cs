@@ -10,6 +10,8 @@ using UnityEngine;
 
 public class MQTTConnect : MonoBehaviour
 {
+    public Action<string, string> OnTopicResponse;
+    
     // Start is called before the first frame update
     void Start()
     {
@@ -56,9 +58,11 @@ public class MQTTConnect : MonoBehaviour
             // received messages get lost.
             mqttClient.ApplicationMessageReceivedAsync += e =>
             {
-                Debug.LogFormat("Received application message: {0} {1}",
-                    e.ApplicationMessage.Topic,
-                    System.Text.Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment.Array));
+                var msg = Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment.Array);
+                
+                Debug.LogFormat("Received application message: {0} {1}", e.ApplicationMessage.Topic,msg);
+                OnTopicResponse?.Invoke(e.ApplicationMessage.Topic, msg);
+                
                 //e.DumpToConsole();
 
                 return Task.CompletedTask;
