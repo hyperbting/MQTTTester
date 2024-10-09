@@ -23,7 +23,8 @@ public class MQTTConnectUser : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        _ = con.Connect_Client();
+        //_ = con.Connect_Client();
+        con.ConnectBroker("tester007,", "123456789", "tester007");
     }
 
     private void Update()
