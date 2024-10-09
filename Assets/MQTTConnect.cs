@@ -10,6 +10,30 @@ using UnityEngine;
 
 public class MQTTConnect : MonoBehaviour
 {
+    #region UnityMainThreadDispatcher
+    private Queue<Action> _actionQueue = new ();
+    public void Enqueue(Action action)
+    {
+        lock (_actionQueue)
+        {
+            _actionQueue.Enqueue(action);
+        }
+    }
+    #endregion
+    
+    private void Update()
+    {
+        // Execute all queued actions
+        lock (_actionQueue)
+        {
+            while (_actionQueue.Count > 0)
+            {
+                var action = _actionQueue.Dequeue();
+                action?.Invoke();
+            }
+        }
+    }
+    
     #region Broker
     private Uri _mqttBroker = new Uri("mqtts://broker.hivemq.com:1883");
     public Uri SetMqttBroker
@@ -148,7 +172,10 @@ public class MQTTConnect : MonoBehaviour
         try
         {
             var subResult = await mqttClient.SubscribeAsync(mqttSubscribeOptions, cts.Token);
-            OnTopicSubscribed?.Invoke(subResult);
+            Enqueue(() =>
+            {
+                OnTopicSubscribed?.Invoke(subResult);
+            });
 
             Debug.Log("MQTT client subscribed to topic.");
             
@@ -196,7 +223,10 @@ public class MQTTConnect : MonoBehaviour
         switch (conResp.ResultCode)
         {
             case MqttClientConnectResultCode.Success:
-                OnBrokerConnected?.Invoke(conResp);
+                Enqueue(() =>
+                {
+                    OnBrokerConnected?.Invoke(conResp);
+                });
                 return true;//break;
             default:
                 Debug.LogError("MQTTConnecter The MQTT connect response:" + conResp.ResultCode);
@@ -216,7 +246,11 @@ public class MQTTConnect : MonoBehaviour
             var msg = Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment.Array);
             
             Debug.LogFormat("MQTTConnecter Received application message: {0} {1}", e.ApplicationMessage.Topic,msg);
-            OnTopicResponse?.Invoke(e.ApplicationMessage.Topic, msg);
+            // Enqueue the message to be processed on the main thread
+            Enqueue(() =>
+            {
+                OnTopicResponse?.Invoke(e.ApplicationMessage.Topic, msg);
+            });
 
             return Task.CompletedTask;
         };
@@ -224,7 +258,11 @@ public class MQTTConnect : MonoBehaviour
         mqttClient.ConnectingAsync += async e =>
         {
             Debug.Log("MQTTConnecter Connecting to MQTT broker..." + e.ToString());
-            OnBrokerConnecting?.Invoke();
+            // Enqueue the message to be processed on the main thread
+            Enqueue(() =>
+            {
+                OnBrokerConnecting?.Invoke();
+            });
             
             await Task.CompletedTask;
         };
@@ -239,7 +277,10 @@ public class MQTTConnect : MonoBehaviour
         mqttClient.DisconnectedAsync += async e =>
         {
             Debug.LogWarning("MQTTConnecter MQTT client disconnected." + e.ToString());
-            OnBrokerDisconnected?.Invoke();
+            Enqueue(() =>
+            {
+                OnBrokerDisconnected?.Invoke();
+            });
             
             await Task.CompletedTask;// await Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
         };
