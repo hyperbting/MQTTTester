@@ -35,7 +35,7 @@ public class MQTTConnect : MonoBehaviour
     }
     
     #region Broker
-    private Uri _mqttBroker = new Uri("mqtts://broker.hivemq.com:1883");
+    private Uri _mqttBroker = new Uri("mqtts://590314cd8291497a855164509c85c500.s1.eu.hivemq.cloud:8883");
     public Uri SetMqttBroker
     {
         set => _mqttBroker = value;
@@ -51,7 +51,6 @@ public class MQTTConnect : MonoBehaviour
     }
     #endregion
     
-    private int _mqttPort = 1883;
     private CancellationTokenSource cts;
     
     public Action OnBrokerConnecting;
@@ -77,12 +76,26 @@ public class MQTTConnect : MonoBehaviour
         {
             ConfigureMqttClientEvents(mqttClient);
 
+            //Debug.Log("Connecting to broker..." + _mqttBroker.Host.ToString());
             var mqttClientOptions = new MqttClientOptionsBuilder()
                 .WithCredentials(user, passwd) // Set username and password
                 .WithClientId(clientID)
                 .WithProtocolVersion(MqttProtocolVersion.V500)
-                //.WithTcpServer(_mqttBroker, _mqttPort)
+                
+                //.WithTcpServer(_mqttBroker.Host, _mqttBroker.Port)
                 .WithConnectionUri(_mqttBroker) // mqttnet DOESN'T support multiple URI at the same time
+          
+                //.WithTls()// deprecated, use WithTlsOptions instead
+                // .WithTlsOptions(new MqttClientTlsOptions
+                // {
+                //     UseTls = true,
+                //     // AllowUntrustedCertificates = false, // HiveMQ Cloud 使用正式證書，建議設為 false
+                //     //SslProtocol = System.Security.Authentication.SslProtocols.Tls12, // HiveMQ default?
+                //     //IgnoreCertificateChainErrors = false,
+                //     //IgnoreCertificateRevocationErrors = false
+                //
+                // })
+                .WithCleanStart(true)
                 .Build();
 
             try
@@ -257,7 +270,7 @@ public class MQTTConnect : MonoBehaviour
 
         mqttClient.ConnectingAsync += async e =>
         {
-            Debug.Log("MQTTConnecter Connecting to MQTT broker..." + e.ToString());
+            Debug.Log("MQTTConnecter Connecting to MQTT broker... " + e.ToString());
             // Enqueue the message to be processed on the main thread
             Enqueue(() =>
             {
@@ -269,14 +282,14 @@ public class MQTTConnect : MonoBehaviour
 
         mqttClient.ConnectedAsync += async e =>
         {
-            Debug.Log("MQTTConnecter Successfully connected to MQTT broker." + e.ToString());
+            Debug.Log("MQTTConnecter Successfully connected to MQTT broker. " + e.ToString());
             
             await Task.CompletedTask;
         };
 
         mqttClient.DisconnectedAsync += async e =>
         {
-            Debug.LogWarning("MQTTConnecter MQTT client disconnected." + e.ToString());
+            Debug.LogWarning("MQTTConnecter MQTT client disconnected. " + e.ToString());
             Enqueue(() =>
             {
                 OnBrokerDisconnected?.Invoke();
